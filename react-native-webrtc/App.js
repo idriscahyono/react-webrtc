@@ -42,7 +42,7 @@ const App = () => {
   // const remoteStream = useRef(null);
 
   useEffect(() => {
-    socket = io('https://da8200a72bde.ngrok.io/webrtcPeer');
+    socket = io('https://a5f4fe38bbf7.ngrok.io/webrtcPeer');
 
     socket.on('connection-success', succes => {
       console.log(succes);
