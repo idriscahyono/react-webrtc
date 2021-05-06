@@ -10,11 +10,11 @@ class App extends Component {
     super(props);
 
     this.state = {
-      localStream: null, // used to hold local stream object to avoid recreating the stream everytime a new offer comes
-      remoteStream: null, // used to hold remote stream object that is displayed in the main screen
+      localStream: null,
+      remoteStream: null,
 
-      remoteStreams: [], // holds all Video Streams (all remote streams)
-      peerConnections: {}, // holds all Peer Connections
+      remoteStreams: [],
+      peerConnections: {},
       selectedVideo: null,
 
       status: 'Please wait...',
@@ -39,25 +39,14 @@ class App extends Component {
         },
       },
     };
-
-    // DONT FORGET TO CHANGE TO YOUR URL
-    this.serviceIP = 'https://62f7f0c49299.ngrok.io/webrtcPeer';
-
-    // https://reactjs.org/docs/refs-and-the-dom.html
-    // this.localVideoref = React.createRef()
-    // this.remoteVideoref = React.createRef()
+    this.serviceIP = 'https://c37a2c1e217d.ngrok.io/webrtcPeer';
 
     this.socket = null;
-    // this.candidates = []
   }
 
   getLocalStream = () => {
-    // called when getUserMedia() successfully returns - see below
-    // getUserMedia() returns a MediaStream object (https://developer.mozilla.org/en-US/docs/Web/API/MediaStream)
     const success = (stream) => {
       window.localStream = stream;
-      // this.localVideoref.current.srcObject = stream
-      // this.pc.addStream(stream);
       this.setState({
         localStream: stream,
       });
@@ -65,15 +54,12 @@ class App extends Component {
       this.whoisOnline();
     };
 
-    // called when getUserMedia() fails - see below
     const failure = (e) => {
       console.log('getUserMedia Error: ', e);
     };
 
-    // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
-    // see the above link for more constraint options
     const constraints = {
-      // audio: true,
+      audio: true,
       video: true,
       // video: {
       //   width: 1280,
@@ -87,13 +73,11 @@ class App extends Component {
       },
     };
 
-    // https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
     navigator.mediaDevices.getUserMedia(constraints).then(success).catch(failure);
     console.log('run');
   };
 
   whoisOnline = () => {
-    // let all peers know I am joining
     this.sendToPeer('onlinePeers', null, { local: this.socket.id });
   };
 
@@ -107,8 +91,6 @@ class App extends Component {
   createPeerConnection = (socketID, callback) => {
     try {
       let pc = new RTCPeerConnection(this.state.pc_config);
-
-      // add pc to peerConnections object
       const peerConnections = { ...this.state.peerConnections, [socketID]: pc };
       this.setState({
         peerConnections,
@@ -140,18 +122,13 @@ class App extends Component {
         };
 
         this.setState((prevState) => {
-          // If we already have a stream in display let it stay the same, otherwise use the latest stream
           const remoteStream = prevState.remoteStreams.length > 0 ? {} : { remoteStream: e.streams[0] };
-
-          // get currently selected video
           let selectedVideo = prevState.remoteStreams.filter((stream) => stream.id === prevState.selectedVideo.id);
-          // if the video is still in the list, then do nothing, otherwise set to new video stream
           selectedVideo = selectedVideo.length ? {} : { selectedVideo: remoteVideo };
 
           return {
-            // selectedVideo: remoteVideo,
             ...selectedVideo,
-            // remoteStream: e.streams[0],
+
             ...remoteStream,
             remoteStreams: [...prevState.remoteStreams, remoteVideo],
           };
@@ -159,16 +136,15 @@ class App extends Component {
       };
 
       pc.close = () => {
-        // alert('GONE')
+        console.log('Close');
       };
 
       if (this.state.localStream) pc.addStream(this.state.localStream);
 
-      // return pc
       callback(pc);
     } catch (e) {
       console.log('Something went wrong! pc not created!!', e);
-      // return;
+
       callback(null);
     }
   };
@@ -180,10 +156,18 @@ class App extends Component {
       this.getLocalStream();
 
       console.log(data.success);
-      const status = data.peerCount > 1 ? `Total Connected Peers: ${data.peerCount}` : 'Waiting for other peers to connect';
+      const status =
+        data.peerCount > 1 ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}` : 'Waiting for other peers to connect';
 
       this.setState({
         status: status,
+      });
+    });
+
+    this.socket.on('joined-peers', (data) => {
+      this.setState({
+        status:
+          data.peerCount > 1 ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}` : 'Waiting for other peers to connect',
       });
     });
 
@@ -193,32 +177,23 @@ class App extends Component {
       const remoteStreams = this.state.remoteStreams.filter((stream) => stream.id !== data.socketID);
 
       this.setState((prevState) => {
-        // check if disconnected peer is the selected video and if there still connected peers, then select the first
         const selectedVideo = prevState.selectedVideo.id === data.socketID && remoteStreams.length ? { selectedVideo: remoteStreams[0] } : null;
 
         return {
-          // remoteStream: remoteStreams.length > 0 && remoteStreams[0].stream || null,
           remoteStreams,
           ...selectedVideo,
+          status:
+            data.peerCount > 1
+              ? `Total Connected Peers to room ${window.location.pathname}: ${data.peerCount}`
+              : 'Waiting for other peers to connect',
         };
       });
     });
 
-    // this.socket.on('offerOrAnswer', (sdp) => {
-
-    //   this.textref.value = JSON.stringify(sdp)
-
-    //   // set sdp as remote description
-    //   this.pc.setRemoteDescription(new RTCSessionDescription(sdp))
-    // })
-
     this.socket.on('online-peer', (socketID) => {
       console.log('connected peers ...', socketID);
 
-      // create and send offer to the peer (data.socketID)
-      // 1. Create new pc
       this.createPeerConnection(socketID, (pc) => {
-        // 2. Create Offer
         if (pc)
           pc.createOffer(this.state.sdpConstraints).then((sdp) => {
             pc.setLocalDescription(sdp);
@@ -236,7 +211,6 @@ class App extends Component {
         pc.addStream(this.state.localStream);
 
         pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {
-          // 2. Create Answer
           pc.createAnswer(this.state.sdpConstraints).then((sdp) => {
             pc.setLocalDescription(sdp);
 
@@ -250,14 +224,12 @@ class App extends Component {
     });
 
     this.socket.on('answer', (data) => {
-      // get remote's peerConnection
       const pc = this.state.peerConnections[data.socketID];
       console.log(data.sdp);
       pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {});
     });
 
     this.socket.on('candidate', (data) => {
-      // get remote's peerConnection
       const pc = this.state.peerConnections[data.socketID];
 
       if (pc) pc.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -288,7 +260,6 @@ class App extends Component {
             margin: 5,
             backgroundColor: 'black',
           }}
-          // ref={this.localVideoref}
           videoStream={this.state.localStream}
           autoPlay
           muted
@@ -302,7 +273,6 @@ class App extends Component {
             minHeight: '100%',
             backgroundColor: 'black',
           }}
-          // ref={ this.remoteVideoref }
           videoStream={this.state.selectedVideo && this.state.selectedVideo.stream}
           autoPlay
         ></Video>
