@@ -39,7 +39,7 @@ class App extends Component {
         },
       },
     };
-    this.serviceIP = 'https://c37a2c1e217d.ngrok.io/webrtcPeer';
+    this.serviceIP = 'https://0595eaafa078.ngrok.io/webrtcPeer';
 
     this.socket = null;
   }
@@ -150,7 +150,11 @@ class App extends Component {
   };
 
   componentDidMount = () => {
-    this.socket = io(this.serviceIP);
+    this.socket = io(this.serviceIP, {
+      query: {
+        room: window.location.pathname,
+      },
+    });
 
     this.socket.on('connection-success', (data) => {
       this.getLocalStream();

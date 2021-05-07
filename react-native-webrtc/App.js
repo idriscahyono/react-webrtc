@@ -66,7 +66,7 @@ class App extends React.Component {
     };
 
     // DONT FORGET TO CHANGE TO YOUR URL
-    this.serviceIP = 'https://c37a2c1e217d.ngrok.io/webrtcPeer';
+    this.serviceIP = 'https://0595eaafa078.ngrok.io/webrtcPeer';
 
     // this.sdp
     this.socket = null;
@@ -159,23 +159,9 @@ class App extends React.Component {
       };
 
       pc.onaddstream = e => {
-        debugger;
-
         let _remoteStream = null;
         let remoteStreams = this.state.remoteStreams;
         let remoteVideo = {};
-
-        // if (e.stream.getTracks().length === 2) alert(e.stream.getTracks()[0].kind)
-
-        // let swappedStream = new MediaStream()
-        // console.log('0...', swappedStream)
-        // e.stream.getAudioTracks() && swappedStream.addTrack(e.stream.getAudioTracks()[0])
-        // console.log('1...', swappedStream)
-        // e.stream.getVideoTracks() && swappedStream.addTrack(e.stream.getVideoTracks()[0])
-        // console.log('2...', swappedStream)
-
-        // 1. check if stream already exists in remoteStreams
-        // const rVideos = this.state.remoteStreams.filter(stream => stream.id === socketID)
 
         remoteVideo = {
           id: socketID,
@@ -184,57 +170,21 @@ class App extends React.Component {
         };
         remoteStreams = [...this.state.remoteStreams, remoteVideo];
 
-        // 2. if it does exist then add track
-        // if (rVideos.length) {
-        //   _remoteStream = rVideos[0].stream
-        //   _remoteStream.addTrack(e.track, _remoteStream)
-        //   remoteVideo = {
-        //     ...rVideos[0],
-        //     stream: _remoteStream,
-        //   }
-        //   remoteStreams = this.state.remoteStreams.map(_remoteVideo => {
-        //     return _remoteVideo.id === remoteVideo.id && remoteVideo || _remoteVideo
-        //   })
-        // } else {
-        //   // 3. if not, then create new stream and add track
-        //   _remoteStream = new MediaStream()
-        //   _remoteStream.addTrack(e.track, _remoteStream)
-
-        //   remoteVideo = {
-        //     id: socketID,
-        //     name: socketID,
-        //     stream: _remoteStream,
-        //   }
-        //   remoteStreams = [...this.state.remoteStreams, remoteVideo]
-        // }
-
-        // const remoteVideo = {
-        //   id: socketID,
-        //   name: socketID,
-        //   stream: e.streams[0]
-        // }
-
         this.setState(prevState => {
-          // If we already have a stream in display let it stay the same, otherwise use the latest stream
-          // const remoteStream = prevState.remoteStreams.length > 0 ? {} : { remoteStream: e.streams[0] }
           const remoteStream =
             prevState.remoteStreams.length > 0 ? {} : {remoteStream: e.stream};
-
-          // get currently selected video
           let selectedVideo = prevState.remoteStreams.filter(
             stream => stream.id === prevState.selectedVideo.id,
           );
-          // if the video is still in the list, then do nothing, otherwise set to new video stream
           selectedVideo = selectedVideo.length
             ? {}
             : {selectedVideo: remoteVideo};
 
           return {
-            // selectedVideo: remoteVideo,
             ...selectedVideo,
-            // remoteStream: e.streams[0],
+
             ...remoteStream,
-            remoteStreams, //: [...prevState.remoteStreams, remoteVideo]
+            remoteStreams,
           };
         });
       };
@@ -245,10 +195,6 @@ class App extends React.Component {
 
       if (this.state.localStream) {
         pc.addStream(this.state.localStream);
-
-        //   // this.state.localStream.getTracks().forEach(track => {
-        //   //   pc.addTrack(track, this.state.localStream)
-        //   // })
       }
       // return pc
       callback(pc);
@@ -268,7 +214,11 @@ class App extends React.Component {
 
     const room = this.state.room || '';
 
-    this.socket = io.connect(this.serviceIP);
+    this.socket = io.connect(this.serviceIP, {
+      query: {
+        room: `/${room}`,
+      },
+    });
 
     this.socket.on('connection-success', data => {
       this.getLocalStream();
@@ -302,14 +252,14 @@ class App extends React.Component {
       );
 
       this.setState(prevState => {
-        // check if disconnected peer is the selected video and if there still connected peers, then select the first
         const selectedVideo =
           prevState.selectedVideo.id === data.socketID && remoteStreams.length
             ? {selectedVideo: remoteStreams[0]}
             : null;
 
+        console.log('PEER DISCONNECTED', ...selectedVideo);
+
         return {
-          // remoteStream: remoteStreams.length > 0 && remoteStreams[0].stream || null,
           remoteStreams,
           ...selectedVideo,
           status:
@@ -321,15 +271,9 @@ class App extends React.Component {
     });
 
     this.socket.on('online-peer', socketID => {
-      debugger;
       console.log('connected peers ...', socketID);
-
-      // create and send offer to the peer (data.socketID)
-      // 1. Create new pc
       this.createPeerConnection(socketID, pc => {
-        // 2. Create Offer
         if (pc) {
-          // Send Channel
           const handleSendChannelStatusChange = event => {
             console.log(
               'send channel status: ' + this.state.sendChannels[0].readyState,
@@ -346,7 +290,6 @@ class App extends React.Component {
             };
           });
 
-          // Receive Channels
           const handleReceiveMessage = event => {
             const message = JSON.parse(event.data);
             console.log(message);
@@ -390,8 +333,6 @@ class App extends React.Component {
     this.socket.on('offer', data => {
       this.createPeerConnection(data.socketID, pc => {
         pc.addStream(this.state.localStream);
-
-        // Send Channel
         const handleSendChannelStatusChange = event => {
           console.log(
             'send channel status: ' + this.state.sendChannels[0].readyState,
@@ -407,8 +348,6 @@ class App extends React.Component {
             sendChannels: [...prevState.sendChannels, sendChannel],
           };
         });
-
-        // Receive Channels
         const handleReceiveMessage = event => {
           const message = JSON.parse(event.data);
           console.log(message);
@@ -436,10 +375,8 @@ class App extends React.Component {
         };
 
         pc.ondatachannel = receiveChannelCallback;
-        debugger;
         pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(
           () => {
-            // 2. Create Answer
             pc.createAnswer(this.state.sdpConstraints).then(sdp => {
               pc.setLocalDescription(sdp);
 
@@ -454,32 +391,67 @@ class App extends React.Component {
     });
 
     this.socket.on('answer', data => {
-      // get remote's peerConnection
       const pc = this.state.peerConnections[data.socketID];
-      // console.log(data.sdp)
       pc.setRemoteDescription(
         new RTCSessionDescription(data.sdp),
       ).then(() => {});
     });
 
     this.socket.on('candidate', data => {
-      // get remote's peerConnection
       const pc = this.state.peerConnections[data.socketID];
 
-      if (pc) pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      if (pc) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
     });
   };
 
   switchVideo = _video => {
-    debugger;
-    // alert(_video)
     this.setState({
       selectedVideo: _video,
     });
   };
 
   stopTracks = stream => {
+    console.log(stream);
     stream.getTracks().forEach(track => track.stop());
+  };
+
+  disconnect = () => {
+    this.socket.close();
+    this.stopTracks(this.state.localStream);
+    this.state.remoteStreams.forEach(rVideo => this.stopTracks(rVideo.stream));
+    this.peerConnections &&
+      Object.values(this.state.peerConnections).forEach(pc => pc.close());
+
+    this.setState({
+      connect: false,
+      peerConnections: {},
+      remoteStreams: [],
+      localStream: null,
+      remoteStream: null,
+      selectedVideo: null,
+    });
+  };
+
+  cameraBtn = () => {
+    const videoTrack = this.state.localStream
+      .getTracks()
+      .filter(track => track.kind === 'video');
+    videoTrack[0].enabled = !videoTrack[0].enabled;
+    this.setState({
+      camera: videoTrack[0].enabled,
+    });
+  };
+
+  audioBtn = () => {
+    const audioTrack = this.state.localStream
+      .getTracks()
+      .filter(track => track.kind === 'audio');
+    audioTrack[0].enabled = !audioTrack[0].enabled;
+    this.setState({
+      mic: audioTrack[0].enabled,
+    });
   };
 
   render() {
@@ -491,9 +463,8 @@ class App extends React.Component {
       connect,
     } = this.state;
 
-    // debugger
-    const remoteVideos = remoteStreams.map(rStream => {
-      return (
+    const RemoteVideos = () => {
+      return remoteStreams.map(rStream => {
         <TouchableOpacity onPress={() => this.switchVideo(rStream)}>
           <View
             style={{
@@ -513,39 +484,41 @@ class App extends React.Component {
               type="remote"
             />
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity>;
+      });
+    };
+
+    const RemoteVideo = () => {
+      return this.state.selectedVideo ? (
+        <Video
+          keys={2}
+          mirror={true}
+          style={{width: dimensions.width, height: dimensions.height / 2}}
+          objectFit="cover"
+          streamURL={
+            this.state.selectedVideo && this.state.selectedVideo.stream
+          }
+          type="remote"
+        />
+      ) : (
+        <View style={{padding: 15}}>
+          <Text style={{fontSize: 22, textAlign: 'center', color: 'white'}}>
+            Waiting for Peer connection ...
+          </Text>
+        </View>
       );
-    });
+    };
 
-    const remoteVideo = this.state.selectedVideo ? (
-      <Video
-        keys={2}
-        mirror={true}
-        style={{width: dimensions.width, height: dimensions.height / 2}}
-        objectFit="cover"
-        streamURL={this.state.selectedVideo && this.state.selectedVideo.stream}
-        type="remote"
-      />
-    ) : (
-      <View style={{padding: 15}}>
-        <Text style={{fontSize: 22, textAlign: 'center', color: 'white'}}>
-          Waiting for Peer connection ...
-        </Text>
-      </View>
-    );
-
-    if (!connect)
+    if (!connect) {
       return (
         <SafeAreaView style={{flex: 1}}>
           <StatusBar backgroundColor="blue" barStyle={'dark-content'} />
           <View
             style={{
               ...styles.buttonsContainer,
-              // backgroundColor: 'teal',
               paddingHorizontal: 15,
             }}>
             <TextInput
-              // editable
               maxLength={10}
               slectionColor={'green'}
               placeholderTextColor="lightgrey"
@@ -566,8 +539,9 @@ class App extends React.Component {
           </View>
         </SafeAreaView>
       );
+    }
 
-    const videoActionButtons = (
+    const VideoActionButtons = () => (
       <View
         style={{
           ...styles.buttonsContainer,
@@ -576,69 +550,22 @@ class App extends React.Component {
           paddingHorizontal: 15,
         }}>
         <Button
-          onPress={() => {
-            debugger;
-            const videoTrack = localStream
-              .getTracks()
-              .filter(track => track.kind === 'video');
-            videoTrack[0].enabled = !videoTrack[0].enabled;
-            this.setState({
-              camera: videoTrack[0].enabled,
-            });
-          }}
+          onPress={this.cameraBtn}
           title={`camera ${(this.state.camera && '(on)') || '(off)'}`}
           color={`${(this.state.camera && 'black') || 'red'}`}
         />
         <Button
-          onPress={() => {
-            debugger;
-            const audioTrack = localStream
-              .getTracks()
-              .filter(track => track.kind === 'audio');
-            audioTrack[0].enabled = !audioTrack[0].enabled;
-            this.setState({
-              mic: audioTrack[0].enabled,
-            });
-          }}
+          onPress={this.audioBtn}
           title={`mic ${(this.state.mic && '(on)') || '(off)'}`}
           color={`${(this.state.mic && 'black') || 'red'}`}
         />
-        <Button
-          onPress={() => {
-            // disconnect socket
-            this.socket.close();
-
-            // localStream.stop()
-            this.stopTracks(localStream);
-
-            // stop all remote audio & video tracks
-            remoteStreams.forEach(rVideo => this.stopTracks(rVideo.stream));
-
-            // stop all remote peerconnections
-            peerConnections &&
-              Object.values(peerConnections).forEach(pc => pc.close());
-
-            this.setState({
-              connect: false,
-              peerConnections: {},
-              remoteStreams: [],
-              localStream: null,
-              remoteStream: null,
-              selectedVideo: null,
-            });
-          }}
-          title="X DISCONNECT"
-          color="red"
-        />
+        <Button onPress={this.disconnect} title="X DISCONNECT" color="red" />
       </View>
     );
 
     return (
       <SafeAreaView style={{flex: 1}}>
-        <StatusBar backgroundColor="blue" barStyle={'dark-content'} />
-
-        {videoActionButtons}
-
+        <VideoActionButtons />
         <View style={{...styles.videosContainer}}>
           <View
             style={{
@@ -647,8 +574,7 @@ class App extends React.Component {
               top: 10,
               right: 10,
               width: 100,
-              // height: 150,
-              backgroundColor: 'black', //width: '100%', height: '100%'
+              backgroundColor: 'black',
             }}>
             <View style={{flex: 1}}>
               <TouchableOpacity
@@ -666,11 +592,6 @@ class App extends React.Component {
               </TouchableOpacity>
             </View>
           </View>
-          {/* <ScrollView horizontal={true} style={{ 
-            flex: 1,
-            backgroundColor: 'black',
-            padding: 15,
-           }}> */}
           <View
             onPress={() => alert('hello')}
             style={{
@@ -680,11 +601,10 @@ class App extends React.Component {
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-            {remoteVideo}
+            <RemoteVideo />
           </View>
-          {/* </ScrollView> */}
           <ScrollView horizontal={true} style={{...styles.scrollView}}>
-            {remoteVideos}
+            <RemoteVideos />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -714,28 +634,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rtcView: {
-    width: 100, //dimensions.width,
-    height: 150, //dimensions.height / 2,
+    width: 100,
+    height: 150,
     backgroundColor: 'black',
     borderRadius: 5,
   },
   scrollView: {
-    // flex: 1,
-    // // flexDirection: 'row',
-    // backgroundColor: 'black',
-    // padding: 15,
     position: 'absolute',
     zIndex: 0,
     bottom: 10,
     right: 0,
     left: 0,
-    // width: 100, height: 200,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   rtcViewRemote: {
-    width: 110, //dimensions.width,
-    height: 110, //dimensions.height / 2,
-    // backgroundColor: 'black',
+    width: 110,
+    height: 110,
     borderRadius: 5,
   },
 });
